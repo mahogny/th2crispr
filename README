@@ -1,0 +1,14 @@
+This code belongs to the paper
+"An unbiased reconstruction of the T helper cell type 2 differentiation network"
+by J. Henriksson et al.
+
+Corresponding author: Sarah Teichmann, st9@sanger.ac.uk
+
+But for technical questions, consider going straight to Johan Henriksson: mahogny@areta.org
+
+The code provided here is not sufficient to reproduce the article from the raw data - too many BASH scripts
+and Makefiles are scatted over the EBI cluster, with paths that only make sense in that environment.
+However, this code should be more or less complete if count tables are provided
+
+The code is available under the 2-clause BSD license. However, should you find a signicant part useful, please cite our
+paper (or add a reference in your code).
