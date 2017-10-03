@@ -1,0 +1,12 @@
+papername	sourcename
+IL4 a	s8a IL4
+IL4 b	sx2 IL4
+IL4 c	first IL4
+IL13 a	s11 IL13
+IL13 b	sc1 IL13
+Irf4 a	sx4 Irf4
+Irf4 b	sc2a Irf4
+Xbp1 a	s8b Xbp1
+Xbp1 b	sc2b Xbp1
+Gata3 c	sc3 Gata3
+Gata3 d	s9 Gata3
