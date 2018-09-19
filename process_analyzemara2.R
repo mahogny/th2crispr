@@ -6,10 +6,10 @@
 ## 
 gettfdestat <- function(){
   v1 <- rbind(
-    smerge(ensconvert,tcmouse$de_early[,c("ensembl_gene_id","pval")]),  #combining like this a bit nasty
-    smerge(ensconvert,tcmouse$de_late [,c("ensembl_gene_id","pval")]))
+    merge(ensconvert,tcmouse$de_early[,c("ensembl_gene_id","pval")]),  #combining like this a bit nasty
+    merge(ensconvert,tcmouse$de_late [,c("ensembl_gene_id","pval")]))
   v1$pval[is.na(v1$pval)] <- 1
-  v1 <- smerge(v1, map_jaspar_namegenesym)
+  v1 <- merge(v1, map_jaspar_namegenesym)
   tfde <- sqldf("select jasparname, min(pval) as pval from v1 group by jasparname")
   rownames(tfde) <- tfde$jasparname
   tfde  
@@ -26,7 +26,7 @@ readmara.tc <- function(dir){
   colnames(am)<-c("jasparname","maraz")
   am <- am[order(am$jasparname),]
   
-  #Perform averaging
+  #Perform rnaseq averaging
   doav <- function(thi,at){
     thtime <- c("Naive",sprintf("Th%s_%s",thi,c("05h","2h","4h","6h","12h","24h","48h","72h")))
     for(i in 1:length(thtime)){
@@ -46,7 +46,7 @@ readmara.tc <- function(dir){
   list(table0=doav(0,at),
        table2=doav(2,at),
        score=am,
-       scoregene=smerge(map_jaspar_namegenesym, am),  ######### todo: chip: make an exception here
+       scoregene=merge(map_jaspar_namegenesym, am),  ######### todo: chip: make an exception here
        delta0=doav(0,delta),
        delta2=doav(2,delta)
        )
@@ -140,10 +140,11 @@ mara_ko_alltf_cDEgenes_nonconsP <- readmara.ko("out_mara/ko_alltf_cDEgenes_nonco
 ## Coloring for mara overview plots
 getmarapcol <- function(stat){
   pcol <- rep("black",nrow(stat))
-  pcol[grep("Stat6",rownames(stat))]<-"red"
+  #pcol[grep("Stat6",rownames(stat))]<-"red"
   cchip <- "blue"
-  pcol[grep("chip_",rownames(stat))]<-"cchip"
-  pcol[rownames(stat) %in% c("Xbp1","Gata3","Irf4","Batf")] <-cchip
+  pcol[grep("chip_",rownames(stat))] <- cchip
+  pcol[rownames(stat) %in% c("Xbp1","Gata3","Batf")] <-cchip
+  pcol[rownames(stat) %in% c("Irf4")] <- "#000001"
   pcol  
 }
 
@@ -166,14 +167,12 @@ getmaraoverallstat <- function(m, normalize=TRUE){
   avact2 <- maraoverridewithchip(avact2)
   avact0 <- maraoverridewithchip(avact0)
   #Here the score table stops matching
-  newscore <- smerge(
+  newscore <- merge(
     data.frame(jasparname=rownames(avact2), stringsAsFactors = FALSE),
     m$score, all.x = TRUE)
 
-  #pscale <- apply(cbind(avact2,avact0,0),1,max)-apply(cbind(avact2,avact0,0),1,min)
-  #if(!normalize)
-    pscale <- 1
-  pdiff <- (avact2[,ncol(avact2)]-avact2[,1])/pscale
+  pscale <- 1
+  pdiff <- (avact0[,ncol(avact2)]-avact0[,1])/pscale     ## changed
   pinc <- apply((avact2-avact0),1,sum)/pscale
   pcol <- rep("black",nrow(avact2))
   pcol[grep("Stat6",rownames(avact2))]<-"red"
@@ -214,14 +213,24 @@ getmaraoverallstat <- function(m, normalize=TRUE){
 ### Th2 vs Th0 difference, overall 2d scatter plot. Naive/Th2 vs Th0/Th2
 plotMARAoverallDiffvsDiff <- function(stat){
   plot(stat$diffth0,stat$diffnaive,cex=0,
-       xlab="Th2/0 average activity difference",
-       ylab="Th2 Naive/72h activity difference")
+       xlab="Th2/0 average activity difference",   #differentiation
+       ylab="Th2 Naive/72h activity difference")   #activation
   lines(minmax(stat$diffth0),c(0,0),lty=3,col="gray")
   lines(c(0,0),minmax(stat$diffnaive),lty=3,col="gray")
+
+  # col <- rep("black",nrow(stat))
+  # col[rownames(stat) %in% map_jaspar_namegenesym$jasparname[
+  #   map_jaspar_namegenesym$mgi_symbol %in% rownames(sgenescorer2_matrix)[sgenescorer2_matrix$Il4<500]]] <- "red"
+  
+  col <- getmarapcol(stat)
+  
+  #  print(data.frame(stat,col=getmarapcol(stat)))
+  
   plotdottext(
     stat$diffth0,
     stat$diffnaive,
-    labels = stat$jaspar_name,cex=.7,col=getmarapcol(stat))
+    labels = stat$jaspar_name,cex=.7,
+    col=col)  
 }
 
 
@@ -244,6 +253,7 @@ plotMARAoverallDiffvsZ <- function(stat){
 ###############################################
 ##
 plotdottext <- function(x,y,labels,cex,col=rep("black",length(x)),donew=FALSE){
+  
   xnorm <- x/(max(x)-min(x))  #ratio
   ynorm <- y/(max(y)-min(y))
   pd <- data.frame(x=xnorm,y=ynorm)
@@ -259,11 +269,12 @@ plotdottext <- function(x,y,labels,cex,col=rep("black",length(x)),donew=FALSE){
   
   asp[labels %in% c("Yy1","Yy2")] <- FALSE
   asp[grep("Fli1",labels)] <- FALSE
+  asp[col!="black"] <- FALSE
   
   if(donew)
     plot(x,y,cex=0)
   points(x[ asp], y[ asp],pch = 20,cex=0.5,col="gray")
-  text(  x[!asp], y[!asp],labels = labels[!asp],cex=cex,col=col)
+  text(  x[!asp], y[!asp],labels = labels[!asp],cex=cex,col=col[!asp])
 #  text(  x, y,labels = nn,cex=cex,col=col)
 }
 # plotMARAoverallDiffvsDiff(mstat)
@@ -349,10 +360,7 @@ doallMARAglobalplots <- function(){
     pdf(sprintf("out_mara/%s/plot_diffvsDE_norm.pdf",names(v)[i]))
     plotMARAoverallDiffvsDE(mstat)
     dev.off()
-    
-    
   }  
-  
 }
 doallMARAglobalplots()
 
@@ -538,4 +546,161 @@ if(TRUE){
   
   write(outhtml,"out_mara/mouse_alltf_allgenes_alltime_th20/forsite/index.html")
 }
+
+
+
+
+
+
+######################################################################
+### Store MARA act/diff data for the site ############################
+######################################################################
+write_mara_forsite <- function(wm,m){
+  #wm <- "mouse"
+  #m <- mara_mouse_alltf_allgenes_alltime_th20
+  
+  stat <- getmaraoverallstat(m, FALSE)
+  stat <- stat[,c("diffth0","diffnaive","pde","maraz")]
+  colnames(stat) <- sprintf("%s_%s",wm,c("mara_diff","mara_act","mara_pDE20","mara_z"))
+  
+  ######### Sample description #################
+  samplemeta <- data.frame(sample=colnames(stat))
+  samplemeta$organism<-wm
+  samplemeta$'Cell Type'<-"Th2"
+  samplemeta$method<-"MARADERIVED"
+  write.csv(samplemeta,sprintf("out_teichlab/th2crispr_mara_%s_samplemeta.csv",wm),row.names = FALSE, quote = FALSE)
+  
+  ##### the score. remove annoying rows
+  temp <- stat
+  if(wm=="mouse")
+    te <- ensconvert
+  else
+    te <- human_ensconvert
+  te <- te[te$mgi_symbol %in% rownames(temp),]
+  te <- te[isUnique(te$ensembl_gene_id),]
+  te <- te[isUnique(te$mgi_symbol),]
+  rownames(te) <- te$mgi_symbol
+  temp <- temp[rownames(temp) %in% te$mgi_symbol,]
+  rownames(temp) <- te[rownames(temp),]$ensembl_gene_id
+  #colnames(temp) <- sprintf("cr2_%s",colnames(temp))
+  write.csv(temp,sprintf("out_teichlab/th2crispr_mara_%s_data.csv",wm),row.names = TRUE, quote = FALSE)
+}
+
+write_mara_forsite("mouse",mara_mouse_alltf_allgenes_alltime_th20)
+write_mara_forsite("human",mara_human_alltf_allgenes_alltime_th20)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################### output also peak count and MARA over time
+
+
+
+
+write_maratc_lev <- function(wm, m){
+
+  out0 <- m$table0[c(),,drop=FALSE]
+  out2 <- out0
+  outlevel <- levatac.mouse.norm[c(),,drop=FALSE]
+  
+  listout <- list()
+  for(i in 1:nrow(m$table0)){ 
+    #why is .. batf going down?
+    maraname <- rownames(m$table0)[i]
+    jn <- maraname
+    if(jn=="chip_Gata3")
+      jn<-"Gata3_1"
+    if(jn=="chip_Batf")
+      jn<-"Batf3"
+    if(jn=="chip_Irf4")
+      jn<-"Irf4_1"
+    if(jn=="chip_Xbp1")
+      jn<-"Xbp1"
+    jn <- str_replace_all(jn,"\\.\\.","::")
+    sym <- map_jaspar_namegenesym[map_jaspar_namegenesym$jasparname==jn,2]
+    if(length(sym)>0){
+      sym <- sym[1]
+      
+      if(toensid(sym) %in% rownames(tcmouse$av_mtpm)){
+        
+        out0 <- rbind(out0, m$table0[i,])
+        rownames(out0)[nrow(out0)] <- sym
+        
+        out2 <- rbind(out2, m$table2[i,])
+        rownames(out2)[nrow(out2)] <- sym
+        
+        if(sym %!in% rownames(outlevel)){  #extremely pragmatic
+          outlevel <- rbind(outlevel, levatac.mouse.norm[jn,])
+          rownames(outlevel)[nrow(outlevel)] <- sym
+        }
+      }
+      
+    }
+  }
+  
+  rnaseqh <- c(0, 0.5, 2, 4, 6, 12, 24, 48, 72)
+  atach <- c(0, 2, 4, 24, 48, 72)
+  colnames(out0) <- sprintf("maratc_Th0_%s_%sh",wm,rnaseqh)
+  colnames(out2) <- sprintf("maratc_Th2_%s_%sh",wm,rnaseqh)
+  colnames(outlevel) <- sprintf("peaklev_Th2_%s_%sh",wm,atach)
+
+  quickens <- function(temp){
+    if(wm=="mouse")
+      te <- ensconvert
+    else
+      te <- human_ensconvert
+    te <- te[te$mgi_symbol %in% rownames(temp),]
+    te <- te[isUnique(te$ensembl_gene_id),]
+    te <- te[isUnique(te$mgi_symbol),]
+    rownames(te) <- te$mgi_symbol
+    temp <- temp[rownames(temp) %in% te$mgi_symbol,]
+    rownames(temp) <- te[rownames(temp),]$ensembl_gene_id
+    temp
+  }  
+  outlevel <- quickens(outlevel)
+  out0 <- quickens(out0)
+  out2 <- quickens(out2)
+
+  ######### Sample description #################
+  samplemeta <- data.frame(sample=colnames(out0))
+  samplemeta$organism<-wm
+  samplemeta$hours<-rnaseqh
+  samplemeta$'Cell Type'<-"Th0"
+  write.csv(samplemeta,sprintf("out_teichlab/th2crispr_maratc_Th0_%s_samplemeta.csv",wm),row.names = FALSE, quote = FALSE)
+  samplemeta <- data.frame(sample=colnames(out2))
+  samplemeta$organism<-wm
+  samplemeta$hours<-rnaseqh
+  samplemeta$'Cell Type'<-"Th2"
+  write.csv(samplemeta,sprintf("out_teichlab/th2crispr_maratc_Th2_%s_samplemeta.csv",wm),row.names = FALSE, quote = FALSE)
+  
+  write.csv(out0, sprintf("out_teichlab/th2crispr_maratc_Th0_%s_data.csv",wm), row.names = TRUE, quote = FALSE)
+  write.csv(out2, sprintf("out_teichlab/th2crispr_maratc_Th2_%s_data.csv",wm), row.names = TRUE, quote = FALSE)
+
+  ######### Sample description #################
+  samplemeta <- data.frame(sample=colnames(outlevel))
+  samplemeta$organism<-wm
+  samplemeta$hours<-atach
+  samplemeta$'Cell Type'<-"Th2"
+  write.csv(samplemeta,sprintf("out_teichlab/th2crispr_peaklev_Th2_%s_samplemeta.csv",wm),row.names = FALSE, quote = FALSE)
+  
+  write.csv(outlevel, sprintf("out_teichlab/th2crispr_peaklev_Th2_%s_data.csv",wm), row.names = TRUE, quote = FALSE)
+}
+
+
+write_maratc_lev("mouse", mara_mouse_alltf_allgenes_alltime_th20)
+write_maratc_lev("human", mara_human_alltf_allgenes_alltime_th20)
 

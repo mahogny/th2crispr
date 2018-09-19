@@ -447,6 +447,7 @@ for(i in 1:ncol(newkoFC)){
   newkoFCnorm[,i] <- newkoFCnorm[,i]/sd(newkoFCnorm[,i])
 }
 
+
 ### by using DE fold changes
 theall<-c()
 allsd<-c()
@@ -626,9 +627,9 @@ ddsFullCountTable <- DESeqDataSetFromMatrix(
 ddsFullCountTable <- DESeq(ddsFullCountTable)
 resTcDiff <- results(ddsFullCountTable)
 
-#### Calculate activity DE: Th2 0h vs Th2 72h
+#### Calculate activity DE: Th0 0h vs Th2 72h   #Changed from Th2
 datTcAct <- read.csv("out_tc/mouse/all_samples_mouse_genes_Salmon_counts.txt",sep="\t",row.names = "gene")
-datTcAct <- datTcAct[,c(grep("Naive_",colnames(datTcAct)), grep("Th2_72h_",colnames(datTcAct)))]
+datTcAct <- datTcAct[,c(grep("Naive_",colnames(datTcAct)), grep("Th0_72h_",colnames(datTcAct)))]
 ddsFullCountTable <- DESeqDataSetFromMatrix(
   countData = round(datTcAct),
   colData = data.frame(row.names = colnames(datTcAct), isact = factor(colnames(datTcAct) %!in% colnames(datTcAct)[grep("Naive",colnames(datTcAct))])),
@@ -760,7 +761,7 @@ write.csv(res_samplemeta_pval,"out_teichlab/th2crispr_ko_samplemeta_pval.csv",ro
 
 ## Which genes to store
 badbifurlo <- c("ENSMUSG00000097058",toensid(c("4930556m19rik","Gm20796","Mical3","Mtcp1","Supt20")))
-keep <- (rownames(respval) %!in% badbifurlo) & apply(abs(resfc),1,min)>0.05
+keep <- (rownames(respval) %!in% badbifurlo) #& apply(abs(resfc),1,min)>0.05
 
 ## KO pval
 temp <- respval[keep,]
@@ -774,3 +775,76 @@ colnames(temp) <- sprintf("ko_%s_fc",colnames(temp))
 temp <- temp[rownames(temp) %!in% badbifurlo,]
 write.csv(temp,"out_teichlab/th2crispr_ko_fc.csv",row.names = TRUE, quote = FALSE)
 
+
+
+
+
+
+######### Sample description #################
+
+out <- t(compkoTcAcDiff$theall)
+
+quickens <- function(temp){
+  te <- ensconvert
+  te <- te[te$mgi_symbol %in% rownames(temp),]
+  te <- te[isUnique(te$ensembl_gene_id),]
+  te <- te[isUnique(te$mgi_symbol),]
+  rownames(te) <- te$mgi_symbol
+  temp <- temp[rownames(temp) %in% te$mgi_symbol,]
+  rownames(temp) <- te[rownames(temp),]$ensembl_gene_id
+  temp
+}  
+out <- quickens(out)  #losing 2 genes here
+colnames(out) <- c("th2crispr_ko_act","th2crispr_ko_diff")
+
+samplemeta <- data.frame(sample=colnames(out))
+samplemeta$organism<-"mouse"
+samplemeta$'Cell Type'<-"Th2"
+write.csv(samplemeta,"out_teichlab/th2crispr_ko_diffact_samplemeta.csv",row.names = FALSE, quote = FALSE)
+
+write.csv(out, sprintf("out_teichlab/th2crispr_ko_diffact_data.csv",wm), row.names = TRUE, quote = FALSE)
+
+
+
+######################################################################
+############### Volcano of act/diff genes ############################
+######################################################################
+
+
+x <- as.data.frame(resTcAct)
+x$ensembl_gene_id <- rownames(x)
+x <- merge(x, ensconvert)
+x <- x[grep("Il",x$mgi_symbol),]
+
+plot(x$log2FoldChange, log10(x$padj),cex=0)#, ylim=c(0,-50))
+text(x$log2FoldChange, log10(x$padj),labels = x$mgi_symbol)
+
+x <- x[order(x$padj),]
+x
+
+#il2 il2ra  Cdk4   Ybx1   (eif5a)  (rps27l)    Ranbp1   Cdca7   Rpl7l1   Plk2    Lif   Cdkn1a   Cacna1i
+
+#Focusing on act diff: Il12rb1, Il7r, Il6st, Il6ra, Il16, Il17ra,   (il10 is 2e-2)
+
+
+x[order(x$mgi_symbol),]
+
+x <- as.data.frame(resTcDiff)
+x$ensembl_gene_id <- rownames(x)
+x <- merge(x, ensconvert)
+x <- x[grep("Il",x$mgi_symbol),]
+
+plot(x$log2FoldChange, log10(x$padj),cex=0)#, ylim=c(-40,0), xlim=c(-12,12))
+text(x$log2FoldChange, log10(x$padj),labels = x$mgi_symbol)
+
+
+#Ms4a4b
+#Il4
+#Ccr4
+#Ccr6
+#Batf
+#Il9r
+#Il18r
+#Il13, Il24
+#Il10
+#Il12rb1

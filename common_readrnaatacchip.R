@@ -92,7 +92,7 @@ symrange <- function(x){
   c(-max(abs(x)),max(abs(x)))
 }
 
-normalizesym <- function(s) paste(str_sub(s,1,1),str_to_lower(str_sub(s,2)),sep="")
+normalizesym <- function(s) paste(str_to_upper(str_sub(s,1,1)),str_to_lower(str_sub(s,2)),sep="")
 
 #########
 ## Function to calculate a "correlation matrix" of jaccard indices
@@ -105,6 +105,10 @@ corjaccard <- function(vd){
       v[i,j] <- sum(vd[,i]>0 & vd[,j]>0) / sum(vd[,i]>0 | vd[,j]>0)
     }
   v
+}
+
+vecjaccard <- function(vi,vj){
+  sum(vi>0 & vj>0) / sum(vi>0 | vj>0)
 }
 
 #########
@@ -248,8 +252,10 @@ read.mtpm <- function(org, ensconvert_){
   
   mtpm <- read.csv(sprintf("out_tc/%s/tpm.txt",org),sep="\t",row.names = "gene")
   mtpm <- mtpm[,colnames(mtpm)!="row.names"]
-
-  ### Calculate average MTPM over time
+  colnames(mtpm) <- str_replace_all(colnames(mtpm),"rep","")
+  
+  
+  ### Calculate average TPM over time, Th2
   mtpm_times <- c(0,0.5,1,2,4,6,12,24,48,72)
   av_mtpm <- cbind(  #Th2
     apply(mtpm[,grep("Naive",colnames(mtpm))],1,mean),
@@ -264,6 +270,8 @@ read.mtpm <- function(org, ensconvert_){
     apply(mtpm[,grep("Th2_72h",colnames(mtpm))],1,mean)
   )
   colnames(av_mtpm) <- sprintf("%sh",mtpm_times)
+  
+  ### Calculate average TPM over time, Th0
   av_mtpm0 <- cbind(
     apply(mtpm[,grep("Naive",colnames(mtpm))],1,mean),
     apply(mtpm[,grep("Th0_05h",colnames(mtpm))],1,mean),
@@ -276,6 +284,7 @@ read.mtpm <- function(org, ensconvert_){
     apply(mtpm[,grep("Th0_48h",colnames(mtpm))],1,mean),
     apply(mtpm[,grep("Th0_72h",colnames(mtpm))],1,mean)
   )
+#  print(head(av_mtpm0))
   max_mtpm <- apply(av_mtpm,1,max)
   
   mtpm_th0 <- mtpm[,c(
@@ -338,6 +347,9 @@ read.mtpm <- function(org, ensconvert_){
 
 tcmouse <- read.mtpm("mouse", ensconvert_ = ensconvert)
 tchuman <- read.mtpm("human", ensconvert_ = human_ensconvert)
+
+
+
 
 expressedTFjaspar <- function(tc, tpm=1){
   unique(tc$motif_explevel$jasparname[tc$motif_explevel$maxexp>tpm])
@@ -610,13 +622,14 @@ normlevatacTime <- function(tfatall){
     tfatall_normtime2[,i] <- tfatall_normtime2[,i]/temp
   }
   tfatall_normtime2[order(tfatall_normtime2[,6]),]
-#  tfatall_normtime2 <- xxxx()
 }
 
 levatac.mouse <- getnormATAC("mouse", atac.mouse)
 levatac.mouse.norm <- normlevatacTime(levatac.mouse)
 
 
+### Store for website
+write.csv(levatac.mouse.norm,"out_teichlab/th2crispr_mouse_TFchrom_data.csv",row.names = TRUE, quote = FALSE)
 
 
 

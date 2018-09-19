@@ -131,6 +131,23 @@ pdf("out_chip/gbi_venn.pdf")
 vennDiagram(vc,cex=c(1.5,1.5,1.5))
 dev.off()
 
+vecjaccard(vd[,1], vd[,2])
+vecjaccard(vd[,1], vd[,3])  
+vecjaccard(vd[,3], vd[,2])  #no collaboration gata3  vs batf/irf4
+
+
+# testPeakOverlap <- function(seta, setb){
+#   totalsites <- length(seta)
+#   n <- length(intersect(mygeneset, genesinterm))
+#   m <- length(setdiff(mygeneset, genesinterm))
+#   tm <- matrix(c(
+#     n, length(genesinterm)-n,
+#     m, length(backgroundset)-m
+#   ),nrow=2)
+#   fisher.test(tm)$p.value
+# }
+
+
 genes_gbi <- sort(unique(dgbi[apply(vd,1,sum)>=3,]$Gene.Name))
 genes_gbi
 
@@ -158,4 +175,102 @@ sort(unique(cs$Gene.Name))
 head(cs,n=100)
 
 
+
+
+
+####################################################################
+##### Gata3 timecourse analysis ####################################
+####################################################################
+
+timesgata3 <- c(0, 24, 48, 72,   0, 24, 48, 72)
+repgata3   <- c(1,  1,  1,  1,   2,  2,  2,  2)
+cntgata3 <- read.table("chip/chipcov_gata3.csv",stringsAsFactors = FALSE)
+colnames(cntgata3)[1:4] <- c("Chr","Start","End","Peakid") 
+cntgata3.ann <- read.csv("chip/chipcov_gata3.csv.ann",sep="\t",stringsAsFactors = FALSE)
+colnames(cntgata3.ann)[1]<-"Peakid"
+
+#Reorder to match up rows. not the same order in files!!!
+cntgata3 <- cntgata3[order(cntgata3$Peakid),]
+cntgata3.ann <- cntgata3.ann[order(cntgata3.ann$Peakid),]
+#all(cntgata3$Peakid==cntgata3.ann$Peakid)
+
+
+#size factor normalization. not using the controls in the end
+cntgata3.av <- cntgata3[,c(5+c(1,2,3))] + cntgata3[,c(9+c(1,2,3))]
+for(i in 1:ncol(cntgata3.av)){
+  cntgata3.av[,i] <- cntgata3.av[,i] / sum(cntgata3.av[,i])
+}
+#normalize each peak against initial level
+cntgata3.sum <- cntgata3.av[,1]
+cntgata3.ann$totalcount <- apply(cntgata3.av,1,sum)
+for(i in 1:ncol(cntgata3.av)){
+  cntgata3.av[,i] <- cntgata3.av[,i] / cntgata3.sum
+}
+cntgata3.ann$inc <- cntgata3.av[,3]
+cntgata3.ann.noinf <- cntgata3.ann[!is.infinite(cntgata3.ann$inc),]
+cntgata3.ann.noinf$incorder <- order(cntgata3.ann.noinf$inc)/nrow(cntgata3.ann.noinf)
+
+plot(1:3,c(0,0,0),ylim=c(-2,2),cex=0)
+for(i in 1:nrow(cntgata3.av)){
+  lines(1:3,log10(cntgata3.av[i,]))
+}
+
+#order(c(1,2,3))
+
+#the most decreasing
+go_gata3_dec <- stopgosym(
+  genelist = unique(cntgata3.ann$Gene.Name[order(cntgata3.av[,3])[1:1000]]),
+  bg = unique(cntgata3.ann$Gene.Name))
+
+#the most increasing
+go_gata3_inc <- stopgosym(
+  genelist = unique(cntgata3.ann$Gene.Name[order(decreasing = TRUE,cntgata3.av[,3])[1:1000]]),
+  bg = unique(cntgata3.ann$Gene.Name))
+
+#the most increasing, no infinity
+stopgosym(
+  genelist = unique(cntgata3.ann.noinf$Gene.Name[order(decreasing = TRUE,cntgata3.ann.noinf$inc)[1:1000]]),
+  bg = unique(cntgata3.ann$Gene.Name))
+
+#peaks overall
+go_gata3_all <- stopgosym(
+  genelist = unique(cntgata3.ann$Gene.Name),
+  bg = unique(ensconvert$mgi_symbol))
+
+####### where are the interesting peaks? cases
+cntgata3.ann.noinf[which(cntgata3.ann.noinf$Gene.Name=="Il4"),]
+cntgata3.ann.noinf[which(cntgata3.ann.noinf$Gene.Name=="Il13"),]
+cntgata3.ann.noinf[which(cntgata3.ann.noinf$Gene.Name=="Tbx21"),]  #### one is 0.017
+cntgata3.ann.noinf[which(cntgata3.ann.noinf$Gene.Name=="Gata3"),]
+
+####### where are the interesting peaks? rank
+x<-cntgata3.ann.noinf[order(cntgata3.ann.noinf$inc,decreasing = TRUE),]
+x<-x[x$totalcount>200,]
+nrow(x)
+x[1:100,c(2:4,9,10,16,20,21)]
+
+sgenescorer2_matrix["Col10a1",]
+
+cntgata3.ann.noinf[order(cntgata3.ann.noinf$inc,decreasing = FALSE),][1:100,c(2:4,9,10,16,20,21)]  #most decreasing
+# cntgata3.ann.noinf[order(cntgata3.ann.noinf$inc,decreasing = TRUE), ][1:200,c(2:4,9,10,16,20,21)]
+
+# increasing Fam134a,   Gpr132,   1700054M17Rik
+
+# which(cntgata3.ann$Gene.Name=="Il13")
+#chr11 53617069 53618098
+
+### Volcano style
+
+qtextscatter(
+  log10(cntgata3.ann.noinf$inc), 
+  log10(1+cntgata3.ann.noinf$totalcount), 
+  cntgata3.ann.noinf$Gene.Name,
+  cex=0.5)
+
+### Store data for supplementary
+
+write.table(cntgata3.ann, "chip/out_gata3/dynamics.csv", row.names = FALSE, sep="\t")
+write.table(go_gata3_inc, "chip/out_gata3/go_inc.csv",   row.names = FALSE, sep="\t")
+write.table(go_gata3_dec, "chip/out_gata3/go_dec.csv",   row.names = FALSE, sep="\t")
+write.table(go_gata3_all, "chip/out_gata3/go_all.csv",   row.names = FALSE, sep="\t")
 

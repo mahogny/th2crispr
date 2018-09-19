@@ -418,8 +418,10 @@ dev.off()
 
 
 ################################################################################
-##################### plot an example screening ################################
+##################### plot an example screening vs FC ##########################
 ################################################################################
+
+
 getscreenPFC <- function(sname){
   p<-sposp[,sname]
   p[p>snegp[,sname]] <- -snegp[p>snegp[,sname],sname]
@@ -428,6 +430,7 @@ getscreenPFC <- function(sname){
   p <- merge(p,fc)
   p <- p[p$tpm>15,] #gata3 is 24. stat6 is 104
   p$p <- sign(p$p)*log10(abs(p$p)) #convert p values into log10
+  p
 }
 
 plotPFC <- function(p){
@@ -445,6 +448,83 @@ plotPFC <- function(p){
 pdf("out_screenqc/ex_sc3_gata3.pdf")
 plotPFC(getscreenPFC("sc3_gata3"))
 dev.off()
+
+
+
+################################################################################
+##################### plot an example screening vs Th20 pval ###################
+################################################################################
+
+getscreenPFC_pval <- function(sname){
+  sname <- "sc3_gata3"
+  p<-sposp[,sname]
+  p[p>snegp[,sname]] <- -snegp[p>snegp[,sname],sname]
+  p <- data.frame(id=rownames(sposp),p=p,stringsAsFactors=FALSE)
+  fc <- data.frame(id=tcmouse$de_early$mgi_symbol,fc = tcmouse$de_early$pval, stringsAsFactors=FALSE)
+  fc <- sqldf("select id, min(fc) as fc from fc group by id")
+  p <- merge(p,fc)
+  expgenes <- ensconvert$mgi_symbol[ensconvert$ensembl_gene_id %in% rownames(tcmouse$av_mtpm)[tcmouse$av_mtpm>15]]
+#  print(expgenes)
+#  print(head(p))
+  p <- p[p$id %in% expgenes,]
+  p$fc <- log10(p$fc) 
+  #print(head(p))
+  #print(6666)
+#  p <- p[p$tpm>15,] #gata3 is 24. stat6 is 104
+  p$p <- sign(p$p)*log10(abs(p$p)) #convert p values into log10
+  p
+}
+
+plotdottext_ex <- function(x,y,labels,cex,col=rep("black",length(x)),donew=FALSE){
+  
+  xnorm <- x/(max(x)-min(x))  #ratio
+  ynorm <- y/(max(y)-min(y))
+  pd <- data.frame(x=xnorm,y=ynorm)
+  pd <- as.matrix(dist((pd)))
+  
+  #666
+  #Local density
+  nn <- apply(pd<0.05,1,sum)
+  asp <- nn>3
+  #Make exceptions
+  cd <- apply(pd,1,function(v) sort(v)[2])
+  asp[cd>0.1] <- FALSE
+  
+  asp[col!="black"] <- FALSE
+  
+  if(donew)
+    plot(x,y,cex=0)
+  points(x[ asp], y[ asp],pch = 20,cex=0.5,col="gray")
+  text(  x[!asp], y[!asp],labels = labels[!asp],cex=cex,col=col[!asp])
+  #  text(  x, y,labels = nn,cex=cex,col=col)
+}
+
+
+plotPFC_pval <- function(p){
+  plot(p$p, p$fc,cex=0,
+       xlab="Screen hit Log10 p-value",
+       ylab="DE Log10 p-value")
+  col <- rep("black",length(p$p))
+  col[p$id %in% c("Gata3","Stat6")] <- "red"
+  plotdottext_ex(p$p, p$fc, p$id, cex=1, col=col)
+}
+
+pdf("out_screenqc/ex_sc3_gata3_th02.pdf")
+plotPFC_pval(getscreenPFC_pval("sc3_gata3"))
+dev.off()
+
+
+# plab <- p$p>2.7 | p$p < -2.6 | p$fc < -21
+# plot(p$p,p$fc,cex=0,xlim=c(-6,6),ylab="DE Log10 p-value",xlab="Screen hit Log10 p-value")
+# points(p$p[!plab],p$fc[!plab],col="blue",pch=19,cex=0.1)
+# ###draw gray line cross hair
+# pcol <- rep("black",nrow(p))
+# pcol[p$id %in% c("Gata3","Stat6")]<-"red"
+# #pcol[p$id=="Stat6"]<-"red"
+# psize <- rep(0.5,nrow(p))
+# psize[which(pcol=="red")] <- 0.8
+# text(p$p[plab],p$fc[plab],labels=p$id[plab],col=pcol[plab],cex=psize[plab])
+
 
 
 

@@ -671,6 +671,18 @@ aracne2gml("aracne/f_tc_regulon_rnpep.mouse.gml",
            filterAracneHit(filterAracneATACCHIP(net), cutoff = 1000),keepdeset = allde$ens_mouse[allde$conserved_loose],
            colorbyhit = c(aracne2gml_colors)
 )
+thegene <- toensid("Sqstm1")
+net <- aracne_mousetc[aracne_mousetc$Regulator==thegene | aracne_mousetc$Target==thegene,]
+aracne2gml("aracne/f_tc_regulon_sqstm1.mouse.gml",  
+           filterAracneHit(filterAracneATACCHIP(net), cutoff = 1000),keepdeset = allde$ens_mouse[allde$conserved_loose],
+           colorbyhit = c(aracne2gml_colors)
+)
+thegene <- toensid("Irf8")
+net <- aracne_mousetc[aracne_mousetc$Regulator==thegene | aracne_mousetc$Target==thegene,]
+aracne2gml("aracne/f_tc_regulon_irf8.mouse.gml",  
+           filterAracneHit(filterAracneATACCHIP(net), cutoff = 1000),keepdeset = allde$ens_mouse[allde$conserved_loose],
+           colorbyhit = c(aracne2gml_colors)
+)
 thegene <- toensid("Ccdc134")   #shown network: removed non-hits
 net <- aracne_mousetc[aracne_mousetc$Regulator==thegene | aracne_mousetc$Target==thegene,]
 aracne2gml("aracne/f_tc_regulon_ccdc134.mouse.gml",  
@@ -1114,3 +1126,58 @@ sgenescorer2_matrix["Stat4",]
 
 
 
+
+###############################################################################################
+###### Plot interesting genes TC ##############################################################
+###############################################################################################
+
+
+
+tcmouse$mtpm_th2[toensid("Sqstm1"),]
+  
+plotTpmTC20 <- function(gname, mouse=TRUE, title){
+  pcol <- c("#00FF00","#FF0000")
+  tp <- c("0h","0.5h","1h","2h","4h","6h","12h","24h","48h","72h")
+  lwd <- 2
+  if(mouse){
+    gid <- toensid(gname)
+    usetc <- tcmouse
+    lev2 <- as.double(usetc$av_mtpm[gid,])
+    lev0 <- as.double(usetc$av_mtpm0[gid,])
+  } else {
+    gid <- toensid2(gname,ensconvert_ = human_ensconvert)
+    usetc <- tchuman
+    lev2 <- as.double(usetc$av_mtpm[gid,])
+    lev0 <- as.double(usetc$av_mtpm0[gid,])
+  }
+  ymax <- max(c(lev0,lev2))
+  plot(1:10,lev0,col=pcol[1],  xaxt = "n", type="l",
+       ylab="TPM",xlab="",ylim=c(0,ymax),lwd=lwd, main=title) 
+  lines(1:10,lev2,type="l",col=pcol[2],lwd=lwd) 
+  legend(6,ymax,c("Th0","Th2"),cex=1.2,fill = pcol,y.intersp=0.65,box.lwd = 0)
+  axis(1, at = 1:length(tp), labels=tp)
+}
+
+pdf("aracne/tc.pdf",width = length(genelist)*4, height=6)
+genelist <- c("Sqstm1","Hk1","Rnpep","Irf8","Ube2m","Ybx1","Gata3","Il4","Tbx21","Xbp1","Irf4","Batf")
+par(mfrow=c(2,length(genelist)))
+for(formouse in c(TRUE,FALSE)){
+  for(g in genelist){
+    plotTpmTC20(g, mouse=formouse, g)
+  }
+}
+dev.off()
+
+
+plotTpmTC20("Sqstm1", mouse=formouse)
+plotTpmTC20("Hk1",mouse=formouse)
+plotTpmTC20("Rnpep",mouse=formouse)
+plotTpmTC20("Irf8",mouse=formouse)   #in human fairly different. and mouse. different ways
+plotTpmTC20("Ube2m",mouse=formouse)
+plotTpmTC20("Xbp1",mouse=formouse)
+plotTpmTC20("Ybx1",mouse=formouse)
+plotTpmTC20("Gata3",mouse=formouse)
+plotTpmTC20("Il4",mouse=formouse)
+
+
+plotTpmTC20("Hk1",mouse=FALSE)
